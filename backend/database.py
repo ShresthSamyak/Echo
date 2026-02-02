@@ -44,7 +44,8 @@ class Database:
         brand_id: str,
         mode: str = "PRE_PURCHASE",
         product_id: Optional[str] = None,
-        model_id: Optional[str] = None
+        model_id: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> bool:
         """Create a new conversation session"""
         if not self.enabled:
@@ -57,6 +58,7 @@ class Database:
                 "mode": mode,
                 "product_id": product_id,
                 "model_id": model_id,
+                "user_id": user_id,
                 "messages": [],
                 "metadata": {}
             }).execute()
@@ -74,9 +76,10 @@ class Database:
             response = self.client.table("conversations")\
                 .select("*")\
                 .eq("session_id", session_id)\
-                .single()\
                 .execute()
-            return response.data
+            
+            # Return first result or None if no results
+            return response.data[0] if response.data else None
         except Exception as e:
             print(f"Error retrieving conversation: {e}")
             return None
@@ -211,6 +214,37 @@ class Database:
         except Exception as e:
             print(f"Error deleting conversation: {e}")
             return False
+    
+    def list_conversations(
+        self,
+        user_id: str,
+        model_id: Optional[str] = None,
+        mode: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict]:
+        """List conversations for user, optionally filtered by product/mode"""
+        if not self.enabled:
+            return []
+        
+        try:
+            query = self.client.table("conversations")\
+                .select("*")\
+                .eq("user_id", user_id)
+            
+            if model_id:
+                query = query.eq("model_id", model_id)
+            if mode:
+                query = query.eq("mode", mode)
+            
+            response = query\
+                .order("created_at", desc=True)\
+                .limit(limit)\
+                .execute()
+            
+            return response.data if response.data else []
+        except Exception as e:
+            print(f"Error listing conversations: {e}")
+            return []
 
 
 # Global database instance

@@ -1,42 +1,28 @@
 """
-Vision Analyzer using OpenRouter API
-Based on official OpenRouter documentation via Context7
-Supports free vision models with proper authentication
+Vision Analyzer using Google Gemini 2.0 Flash
+Extracts structured JSON data from images for product-specific analysis
+Uses the NEW Gemini SDK (google.genai) with correct API
 """
 
-import requests
+from google import genai
 import json
-import base64
 from typing import Optional, Dict, Any
 from config import settings
+import PIL.Image
+import io
 
-class QwenVisionAnalyzer:
+class GeminiVisionAnalyzer:
     """
-    Vision analysis using OpenRouter's free vision models
-    Implementation from official OpenRouter docs
+    Vision analysis agent using Google Gemini 2.0 Flash
+    Based on official Gemini API documentation
     """
     
     def __init__(self):
-        """Initialize OpenRouter with API key"""
-        self.api_key = settings.OPENROUTER_API_KEY
-        self.base_url = "https://openrouter.ai/api/v1/chat/completions"
-        
-        # Use FREE vision model - Google Gemini Flash 1.5 8B
-        self.model = "google/gemini-flash-1.5-8b"
-        
-        if self.api_key:
-            print(f"🔑 OpenRouter Vision initialized")
-            print(f"✅ Using FREE model: {self.model}")
-        else:
-            print("❌ OpenRouter API Key is MISSING!")
-    
-    def _encode_image_to_base64(self, image_data: bytes) -> str:
-        """
-        Encode image bytes to base64 data URI
-        Official format from OpenRouter docs
-        """
-        base64_image = base64.b64encode(image_data).decode('utf-8')
-        return f"data:image/jpeg;base64,{base64_image}"
+        """Initialize Gemini client with API key"""
+        self.client = genai.Client(api_key=settings.google_api_key)
+        # Use Gemini 2.0 Flash - official model from docs
+        self.model = "gemini-2.0-flash"
+        print(f"🔑 Gemini Vision initialized with model: {self.model}")
         
     def _build_vision_prompt(self, product_name: str, model_id: str, category: str) -> str:
         """Build the system prompt for vision analysis"""
@@ -128,71 +114,28 @@ Be precise. Be conservative. No extra text. Return ONLY the JSON."""
         model_id: str,
         category: str
     ) -> Dict[str, Any]:
-        """
-        Analyze an image using OpenRouter vision API
-        Official implementation from OpenRouter docs
-        """
+        """Analyze an image and extract structured information"""
         try:
             # Build system prompt
             prompt = self._build_vision_prompt(product_name, model_id, category)
             
-            # Encode image to base64 data URI (official format)
-            image_url = self._encode_image_to_base64(image_data)
+            # Convert bytes to PIL Image (as per Gemini docs)
+            image = PIL.Image.open(io.BytesIO(image_data))
             
-            print(f"🔍 Analyzing image with OpenRouter (FREE)...")
+            print(f"🔍 Analyzing image with Gemini 2.0 Flash...")
             
-            # Official OpenRouter API request format
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": image_url
-                            }
-                        }
-                    ]
-                }
-            ]
-            
-            payload = {
-                "model": self.model,
-                "messages": messages
-            }
-            
-            # Make request
-            response = requests.post(
-                self.base_url,
-                headers=headers,
-                json=payload,
-                timeout=30
+            # Call Gemini API as shown in official docs
+            # The SDK accepts PIL Image objects directly
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=[prompt, image]
             )
             
-            # Check response
-            if response.status_code != 200:
-                error_msg = f"Status {response.status_code}: {response.text}"
-                print(f"❌ OpenRouter API error: {error_msg}")
-                return {
-                    "status": "error",
-                    "message": error_msg
-                }
+            # Extract response text
+            vision_output = response.text
+            print(f"� Gemini raw output: {vision_output[:200]}...")
             
-            # Parse response
-            result = response.json()
-            vision_output = result['choices'][0]['message']['content']
-            print(f"📄 OpenRouter raw output: {vision_output[:200]}...")
-            
-            # Validate JSON
+            # Parse and validate JSON
             vision_json = self._validate_json_output(vision_output)
             
             if vision_json:
@@ -218,4 +161,4 @@ Be precise. Be conservative. No extra text. Return ONLY the JSON."""
             }
 
 # Global instance
-qwen_vision_analyzer = QwenVisionAnalyzer()
+gemini_vision_analyzer = GeminiVisionAnalyzer()

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Literal, List
 import uvicorn
+from contextlib import asynccontextmanager
 
 from config import settings
 from product_db import product_db
@@ -52,25 +53,13 @@ if settings.ai_provider == "openrouter":
         agent = SingleProductAgent(mode=settings.mode)
 # For Groq and Gemini,agent is already imported from their respective modules
 
-app = FastAPI(
-    title="Product Intelligence Agent API",
-    description="Dual-mode AI assistant for pre-purchase consultation and post-purchase support",
-    version="1.0.0"
-)
+from contextlib import asynccontextmanager
 
-# CORS Configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://localhost:5173", "http://localhost:5174"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Startup Event - Initialize Pinecone
-@app.on_event("startup")
-async def startup_event():
-    """Initialize Pinecone vector database on startup"""
+# Define lifespan context manager for startup/shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifecycle events for the FastAPI application"""
+    # Startup: Initialize Pinecone
     if RETRIEVAL_AVAILABLE and settings.pinecone_api_key:
         try:
             print("🔄 Initializing Pinecone vector database...")
@@ -81,12 +70,25 @@ async def startup_event():
             print("✅ Pinecone initialized successfully!")
         except Exception as e:
             print(f"⚠️ Pinecone initialization failed: {e}")
-            print("   RAG retrieval will not be available.")
-    else:
-        if not settings.pinecone_api_key:
-            print("ℹ️ No PINECONE_API_KEY found. RAG retrieval disabled.")
-        if not RETRIEVAL_AVAILABLE:
-            print("ℹ️ Retrieval module not installed. RAG retrieval disabled.")
+            print("   RAG functionality will be limited.")
+    yield
+    # Shutdown logic can go here if needed
+
+app = FastAPI(
+    title="Product Intelligence Agent API",
+    description="Dual-mode AI assistant for pre-purchase consultation and post-purchase support",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.frontend_url, "http://localhost:5173", "http://localhost:5174"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Request/Response Models
 class ChatRequest(BaseModel):
@@ -99,6 +101,7 @@ class ChatResponse(BaseModel):
     response: str
     mode: str
     suggestions: Optional[List[str]] = None
+    vision_data: Optional[dict] = None
 
 class ModeSwitch(BaseModel):
     mode: Literal["PRE_PURCHASE", "POST_PURCHASE"]
@@ -141,18 +144,21 @@ async def chat(
     model_id: Optional[str] = Form(None),
     mode: str = Form("PRE_PURCHASE"),
     conversation_id: Optional[str] = Form(None),
+    language: str = Form("en"),
+    user_id: Optional[str] = Form(None),
     images: List[UploadFile] = File([])
 ):
+
     """
     Main chat endpoint for conversational interaction
     Supports both text-only (Form/JSON) and text+image (multipart) requests
     """
     try:
-        # STAGE 1: Process uploaded images with Qwen2.5-VL (if present)
+        # STAGE 1: Process uploaded images with Gemini Vision (if present)
         vision_json = None
         if images and len(images) > 0:
-            print(f"📷 Stage 1: Analyzing {len(images)} image(s) with Qwen2.5-VL")
             try:
+                print(f"📷 Stage 1: Analyzing {len(images)} image(s) with OpenRouter (FREE)")
                 # Get product context for vision analysis
                 product_name = "Unknown Product"
                 category = "appliance"
@@ -164,7 +170,7 @@ async def chat(
                         product_name = f"{product_data.get('brand', '')} {product_data.get('name', '')}"
                         category = product_data.get('category', 'appliance')
                 
-                # Import and use Qwen vision analyzer
+                # Import and use OpenRouter vision (FREE model)
                 from vision_analyzer_qwen import qwen_vision_analyzer
                 
                 # Process each image (max 3)
@@ -247,7 +253,8 @@ async def chat(
                 user_query=message or "[User sent an image]",
                 product_context=product_context,
                 rag_context=rag_context,
-                vision_json=vision_json
+                vision_json=vision_json,
+                language=language
             )
         
         print(f"✅ Stage 2 Complete: Response generated")
@@ -269,11 +276,14 @@ async def chat(
                 "User manual"
             ]
         
+        
         return ChatResponse(
             response=response,
             mode=agent.mode,
-            suggestions=suggestions
+            suggestions=suggestions,
+            vision_data=vision_json
         )
+
     
     except Exception as e:
         print(f"❌ Chat endpoint error: {e}")
@@ -304,6 +314,16 @@ async def get_conversation_history(session_id: str):
             "session_id": session_id,
             "messages": []
         }
+
+@app.get("/conversations/list")
+async def list_conversations(user_id: str, model_id: Optional[str] = None, mode: Optional[str] = None):
+    """List conversations for a user, filtered by product and mode"""
+    try:
+        conversations = db.list_conversations(user_id=user_id, model_id=model_id, mode=mode)
+        return {"conversations": conversations}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/analyze-room")
 async def analyze_room(file: UploadFile = File(...)):

@@ -25,7 +25,7 @@ class SingleProductAgent:
     ):
         self.mode = mode or settings.mode
         self.conversation_history = []
-        self.api_key = getattr(settings, 'openrouter_api_key', None)
+        self.api_key = getattr(settings, 'OPENROUTER_API_KEY', None)
         
         # Product-specific context
         self.product_data = product_data or {}

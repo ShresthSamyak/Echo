@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     
     # AI Configuration
     ai_provider: str = "openrouter"  # openrouter, gemini, or groq
-    openrouter_api_key: Optional[str] = None  # Optional - free tier works without key
+    OPENROUTER_API_KEY: Optional[str] = None  # Optional - free tier works without key
     google_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
     

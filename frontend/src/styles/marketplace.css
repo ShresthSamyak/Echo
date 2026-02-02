@@ -5,8 +5,14 @@
 }
 
 .marketplace-header {
-    text-align: center;
     margin-bottom: var(--space-12);
+}
+
+.marketplace-header .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-6);
 }
 
 .marketplace-header h1 {
@@ -20,6 +26,38 @@
     font-size: var(--text-lg);
     color: var(--text-secondary);
 }
+
+/* User Section */
+.user-section {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+}
+
+.user-email {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
+}
+
+.btn-logout {
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-medium);
+    background: white;
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: var(--text-sm);
+}
+
+.btn-logout:hover {
+    background: var(--error-surface);
+    color: var(--error-default);
+    border-color: var(--error-default);
+}
+
 
 /* Category Filter */
 .category-filter {

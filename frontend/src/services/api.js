@@ -17,7 +17,7 @@ export const api = {
     },
 
     // Send chat message (with optional multiple images and session ID)
-    async sendMessage(message, modelId, mode = 'PRE_PURCHASE', imageFiles = [], sessionId = null) {
+    async sendMessage(message, modelId, mode = 'PRE_PURCHASE', imageFiles = [], sessionId = null, language = 'en', userId = null) {
         // Handle both array and single file for backwards compatibility
         const images = Array.isArray(imageFiles) ? imageFiles : (imageFiles ? [imageFiles] : []);
 
@@ -27,7 +27,9 @@ export const api = {
             formData.append('message', message || '');
             formData.append('model_id', modelId);
             formData.append('mode', mode);
+            formData.append('language', language);
             if (sessionId) formData.append('session_id', sessionId);
+            if (userId) formData.append('user_id', userId);
 
             // Append multiple images
             images.forEach((file) => {
@@ -46,7 +48,9 @@ export const api = {
             formData.append('message', message || '');
             formData.append('model_id', modelId);
             formData.append('mode', mode);
+            formData.append('language', language);
             if (sessionId) formData.append('conversation_id', sessionId);
+            if (userId) formData.append('user_id', userId);
 
             const response = await fetch(`${API_BASE}/chat`, {
                 method: 'POST',
@@ -89,6 +93,16 @@ export const api = {
             // If endpoint doesn't exist yet or fails, return empty
             return { session_id: sessionId, messages: [] };
         }
+        return response.json();
+    },
+
+    // Get conversations list for a user
+    async getConversations(userId, modelId, mode = null) {
+        const params = new URLSearchParams({ user_id: userId, model_id: modelId });
+        if (mode) params.append('mode', mode);
+
+        const response = await fetch(`${API_BASE}/conversations/list?${params}`);
+        if (!response.ok) throw new Error('Failed to fetch conversations');
         return response.json();
     }
 };

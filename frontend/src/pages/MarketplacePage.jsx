@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { auth } from '../services/auth';
 import ProductCard from '../components/marketplace/ProductCard';
 import '../styles/marketplace.css';
 
 export default function MarketplacePage() {
+    const navigate = useNavigate();
+    const [user, setUser] = useState(null);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [activeCategory, setActiveCategory] = useState('all');
+
+    // Get current user on mount
+    useEffect(() => {
+        auth.getUser().then(setUser);
+    }, []);
 
     // Fetch products on mount
     useEffect(() => {
@@ -26,6 +35,12 @@ export default function MarketplacePage() {
             setLoading(false);
         }
     };
+
+    const handleLogout = async () => {
+        await auth.signOut();
+        navigate('/login');
+    };
+
 
     // Get all products as flat array
     const getAllProductsArray = () => {
@@ -69,8 +84,20 @@ export default function MarketplacePage() {
         <div className="marketplace-page">
             <div className="container">
                 <header className="marketplace-header">
-                    <h1>Product Intelligence Agent</h1>
-                    <p className="subtitle">Browse products with AI assistance</p>
+                    <div className="header-content">
+                        <div>
+                            <h1>Product Intelligence Agent</h1>
+                            <p className="subtitle">Browse products with AI assistance</p>
+                        </div>
+                        {user && (
+                            <div className="user-section">
+                                <span className="user-email">{user.email}</span>
+                                <button onClick={handleLogout} className="btn-logout">
+                                    Logout
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </header>
 
                 {/* Category Filter */}

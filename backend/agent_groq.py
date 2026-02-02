@@ -18,7 +18,7 @@ except ImportError:
     db = None
 
 class GroqAgent:
-    def __init__(self, mode: str = "PRE_PURCHASE", session_id: Optional[str] = None):
+    def __init__(self, mode: str = "PRE_PURCHASE", session_id: Optional[str] = None, user_id: Optional[str] = None):
         self.mode = mode
         self.api_key = settings.groq_api_key
         self.base_url = "https://api.groq.com/openai/v1/chat/completions"
@@ -26,6 +26,8 @@ class GroqAgent:
         self.conversation_history = []  # Fall back in-memory storage
         self.session_id = session_id or str(uuid.uuid4())
         self.brand_id = settings.default_brand_id
+        self.user_id = user_id
+
         
         # Create conversation in database if available
         if DATABASE_AVAILABLE and self.brand_id:
@@ -33,9 +35,11 @@ class GroqAgent:
                 db.create_conversation(
                     session_id=self.session_id,
                     brand_id=self.brand_id,
-                    mode=self.mode
+                    mode=self.mode,
+                    user_id=self.user_id
                 )
                 print(f"✅ Conversation session: {self.session_id}")
+
     
     def switch_mode(self, new_mode: str):
         """Switch between PRE_PURCHASE and POST_PURCHASE modes"""
@@ -45,6 +49,13 @@ class GroqAgent:
     def _get_system_prompt(self) -> str:
         """Get system prompt based on mode"""
         base_prompt = f"""You are a helpful product assistant for {settings.brand_name}.
+
+STRICT PRODUCT SCOPE - CRITICAL RULES:
+- You are bound to EXACTLY ONE product that the user is viewing
+- If the user asks about OTHER products, OTHER brands, or UNRELATED topics:
+  → Respond ONLY: "I'm the AI assistant for this product only. I can help with its buying, usage, or issues."
+- Do NOT answer partially. Do NOT redirect to other products. Fail closed.
+- This applies to ALL queries: text, images, pre-purchase, post-purchase
 
 VECTOR DATABASE RULES:
 - If RETRIEVED DOCUMENTS are provided, use them as your PRIMARY source
@@ -85,7 +96,8 @@ GUIDELINES:
         user_query: str,
         product_context: Optional[Dict] = None,
         rag_context: Optional[str] = None,
-        vision_json: Optional[Dict] = None
+        vision_json: Optional[Dict] = None,
+        language: str = "en"
     ) -> str:
         """Generate response using Groq with vision JSON support"""
         
@@ -167,6 +179,29 @@ Example good response to "What is the warranty period?":
 Example BAD response (DO NOT DO THIS):
 "I'm not able to view images, so I can't see what's shown. Could you describe..."
 """
+        
+        # Add language instruction based on user preference
+        if language == "hi":
+            system_content += """
+
+🌐 LANGUAGE INSTRUCTION - CRITICAL:
+You MUST respond ENTIRELY in Hindi (हिंदी) using Devanagari script.
+- All explanations, descriptions, and conversation should be in Hindi
+- Product brand names (e.g., "AquaTech") can stay in English
+- Numbers and technical specifications should use International numerals (1, 2, 3...)
+- Use natural, conversational Hindi suitable for Indian customers
+
+Example:
+User: "वारंटी कितने साल की है?"
+You: "यह मॉडल 2 साल की वारंटी के साथ आता है जिसमें इन्वर्टर मोटर 5 साल तक कवर होती है..."
+"""
+        else:
+            system_content += """
+
+🌐 LANGUAGE INSTRUCTION:
+You MUST respond in English.
+"""
+
         
         # Build messages
         messages = [{"role": "system", "content": system_content}]

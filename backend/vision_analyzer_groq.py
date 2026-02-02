@@ -1,40 +1,30 @@
 """
-Vision Analyzer using OpenRouter API
-Based on official OpenRouter documentation via Context7
-Supports free vision models with proper authentication
+Vision Analyzer using Groq Llama 3.2 Vision
+Extracts structured JSON data from images for product-specific analysis
+Uses Groq's free vision model - same API as text generation
 """
 
-import requests
+from groq import Groq
 import json
-import base64
 from typing import Optional, Dict, Any
 from config import settings
+import base64
 
-class QwenVisionAnalyzer:
+class GroqVisionAnalyzer:
     """
-    Vision analysis using OpenRouter's free vision models
-    Implementation from official OpenRouter docs
+    Vision analysis agent that extracts structured information from images
+    using Groq's Llama 3.2 90B Vision model (FREE)
     """
     
     def __init__(self):
-        """Initialize OpenRouter with API key"""
-        self.api_key = settings.OPENROUTER_API_KEY
-        self.base_url = "https://openrouter.ai/api/v1/chat/completions"
+        """Initialize Groq client"""
+        self.client = Groq(api_key=settings.groq_api_key)
+        # Use Groq's current vision model (90b was decommissioned)
+        self.model = "llama-3.2-11b-vision-preview"
+        print(f"🔑 Groq Vision initialized with model: {self.model}")
         
-        # Use FREE vision model - Google Gemini Flash 1.5 8B
-        self.model = "google/gemini-flash-1.5-8b"
-        
-        if self.api_key:
-            print(f"🔑 OpenRouter Vision initialized")
-            print(f"✅ Using FREE model: {self.model}")
-        else:
-            print("❌ OpenRouter API Key is MISSING!")
-    
     def _encode_image_to_base64(self, image_data: bytes) -> str:
-        """
-        Encode image bytes to base64 data URI
-        Official format from OpenRouter docs
-        """
+        """Encode image bytes to base64 data URL"""
         base64_image = base64.b64encode(image_data).decode('utf-8')
         return f"data:image/jpeg;base64,{base64_image}"
         
@@ -128,71 +118,40 @@ Be precise. Be conservative. No extra text. Return ONLY the JSON."""
         model_id: str,
         category: str
     ) -> Dict[str, Any]:
-        """
-        Analyze an image using OpenRouter vision API
-        Official implementation from OpenRouter docs
-        """
+        """Analyze an image and extract structured information"""
         try:
             # Build system prompt
             prompt = self._build_vision_prompt(product_name, model_id, category)
             
-            # Encode image to base64 data URI (official format)
+            # Encode image to base64
             image_url = self._encode_image_to_base64(image_data)
             
-            print(f"🔍 Analyzing image with OpenRouter (FREE)...")
+            print(f"🔍 Analyzing image with Groq Vision...")
             
-            # Official OpenRouter API request format
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": image_url
+            # Call Groq Vision API
+            completion = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": image_url}
                             }
-                        }
-                    ]
-                }
-            ]
-            
-            payload = {
-                "model": self.model,
-                "messages": messages
-            }
-            
-            # Make request
-            response = requests.post(
-                self.base_url,
-                headers=headers,
-                json=payload,
-                timeout=30
+                        ]
+                    }
+                ],
+                temperature=0.5,
+                max_tokens=1024
             )
             
-            # Check response
-            if response.status_code != 200:
-                error_msg = f"Status {response.status_code}: {response.text}"
-                print(f"❌ OpenRouter API error: {error_msg}")
-                return {
-                    "status": "error",
-                    "message": error_msg
-                }
+            # Extract response
+            vision_output = completion.choices[0].message.content
+            print(f"📄 Groq raw output: {vision_output[:200]}...")
             
-            # Parse response
-            result = response.json()
-            vision_output = result['choices'][0]['message']['content']
-            print(f"📄 OpenRouter raw output: {vision_output[:200]}...")
-            
-            # Validate JSON
+            # Parse and validate JSON
             vision_json = self._validate_json_output(vision_output)
             
             if vision_json:
@@ -218,4 +177,4 @@ Be precise. Be conservative. No extra text. Return ONLY the JSON."""
             }
 
 # Global instance
-qwen_vision_analyzer = QwenVisionAnalyzer()
+groq_vision_analyzer = GroqVisionAnalyzer()

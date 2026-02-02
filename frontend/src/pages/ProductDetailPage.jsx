@@ -2,7 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Send, Camera, X } from 'lucide-react';
 import { api } from '../services/api';
+import { auth } from '../services/auth';
+import VisionFeedback from '../components/VisionFeedback';
 import '../styles/product.css';
+import '../styles/vision-feedback.css';
 
 export default function ProductDetailPage() {
     const { modelId } = useParams();
@@ -25,6 +28,19 @@ export default function ProductDetailPage() {
     const [uploadError, setUploadError] = useState(null);
     const fileInputRef = useRef(null);
     const MAX_IMAGES = 3;
+
+    // Language state (bilingual support)
+    const [language, setLanguage] = useState(() => {
+        return localStorage.getItem('preferred_language') || 'en';
+    });
+
+    // User state (for product-scoped memory)
+    const [user, setUser] = useState(null);
+
+    // Get current user on mount
+    useEffect(() => {
+        auth.getUser().then(setUser);
+    }, []);
 
     // Fetch product data on mount
     useEffect(() => {
@@ -113,11 +129,24 @@ export default function ProductDetailPage() {
         setIsSending(true);
 
         try {
-            // Send to backend with multiple images and session ID
-            const response = await api.sendMessage(userMessage, modelId, mode, imagesToSend, sessionId);
+            // Send to backend with multiple images, session ID, and language preference
+            const response = await api.sendMessage(
+                userMessage,
+                modelId,
+                mode,
+                imagesToSend,
+                sessionId,
+                language,
+                user?.id
+            );
 
-            // Add assistant response
-            setMessages(prev => [...prev, { role: 'assistant', content: response.response }]);
+
+            // Add assistant response with vision data
+            setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: response.response,
+                visionData: response.vision_data
+            }]);
         } catch (err) {
             setMessages(prev => [...prev, {
                 role: 'assistant',
@@ -196,6 +225,13 @@ export default function ProductDetailPage() {
             console.error('Failed to switch mode:', err);
         }
     };
+
+    const handleLanguageChange = (newLang) => {
+        setLanguage(newLang);
+        localStorage.setItem('preferred_language', newLang);
+        console.log(`🌐 Language changed to: ${newLang === 'hi' ? 'Hindi' : 'English'}`);
+    };
+
 
     if (loading) {
         return (
@@ -302,6 +338,24 @@ export default function ProductDetailPage() {
                                     Support
                                 </button>
                             </div>
+
+                            {/* Language Selector */}
+                            <div className="language-selector">
+                                <button
+                                    className={`language-btn ${language === 'en' ? 'active' : ''}`}
+                                    onClick={() => handleLanguageChange('en')}
+                                    title="Switch to English"
+                                >
+                                    🇬🇧 EN
+                                </button>
+                                <button
+                                    className={`language-btn ${language === 'hi' ? 'active' : ''}`}
+                                    onClick={() => handleLanguageChange('hi')}
+                                    title="हिंदी में स्विच करें"
+                                >
+                                    🇮🇳 हिं
+                                </button>
+                            </div>
                         </div>
 
                         {/* Chat area */}
@@ -322,6 +376,10 @@ export default function ProductDetailPage() {
                                     <div className="message-content">
                                         {msg.content}
                                     </div>
+                                    {/* Vision feedback card for assistant messages with vision data */}
+                                    {msg.role === 'assistant' && msg.visionData && (
+                                        <VisionFeedback visionData={msg.visionData} />
+                                    )}
                                 </div>
                             ))}
 
