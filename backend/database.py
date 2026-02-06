@@ -23,16 +23,16 @@ class Database:
         supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
         
         if not supabase_url or not supabase_key:
-            print("⚠️ Supabase credentials not found. Database features disabled.")
+            print("[WARNING] Supabase credentials not found. Database features disabled.")
             self.client = None
             self.enabled = False
         else:
             try:
                 self.client: Client = create_client(supabase_url, supabase_key)
                 self.enabled = True
-                print("✅ Supabase database connected!")
+                print("[SUCCESS] Supabase database connected!")
             except Exception as e:
-                print(f"❌ Supabase connection failed: {e}")
+                print(f"[ERROR] Supabase connection failed: {e}")
                 self.client = None
                 self.enabled = False
     

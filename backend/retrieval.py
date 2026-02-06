@@ -25,7 +25,7 @@ def initialize_pinecone(api_key: str, index_name: str = "product-manuals"):
     # Initialize FREE local embedding model
     print("Loading local embedding model (one-time download)...")
     embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-    print("✅ Embedding model loaded!")
+    print("[SUCCESS] Embedding model loaded!")
     
     # Create index if it doesn't exist
     # all-MiniLM-L6-v2 produces 384-dimensional vectors
@@ -39,7 +39,7 @@ def initialize_pinecone(api_key: str, index_name: str = "product-manuals"):
                 region="us-east-1"
             )
         )
-        print(f"✅ Created Pinecone index: {index_name}")
+        print(f"[SUCCESS] Created Pinecone index: {index_name}")
     
     index = pc.Index(index_name)
     return index

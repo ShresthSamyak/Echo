@@ -15,7 +15,7 @@ try:
     RETRIEVAL_AVAILABLE = True
 except ImportError:
     RETRIEVAL_AVAILABLE = False
-    print("⚠️ Retrieval module not available. Install: pip install sentence-transformers pinecone-client")
+    print("[WARNING] Retrieval module not available. Install: pip install sentence-transformers pinecone-client")
 
 # Import based on AI provider
 if settings.ai_provider == "openrouter":
@@ -62,14 +62,14 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize Pinecone
     if RETRIEVAL_AVAILABLE and settings.pinecone_api_key:
         try:
-            print("🔄 Initializing Pinecone vector database...")
+            print("[INFO] Initializing Pinecone vector database...")
             initialize_pinecone(
                 api_key=settings.pinecone_api_key,
                 index_name=settings.pinecone_index_name
             )
-            print("✅ Pinecone initialized successfully!")
+            print("[SUCCESS] Pinecone initialized successfully!")
         except Exception as e:
-            print(f"⚠️ Pinecone initialization failed: {e}")
+            print(f"[WARNING] Pinecone initialization failed: {e}")
             print("   RAG functionality will be limited.")
     yield
     # Shutdown logic can go here if needed
