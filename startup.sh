@@ -1,21 +1,12 @@
 #!/bin/bash
 set -e
 
-# Use system Python (available on Azure App Service Linux)
 cd /home/site/wwwroot
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-fi
-
-# Activate virtual environment
-source venv/bin/activate
-
-# Install dependencies
-pip install --upgrade pip
-pip install -r requirements.txt
+# Install dependencies using system Python (to user directory)
+python3 -m pip install --upgrade pip --user
+python3 -m pip install -r requirements.txt --user
 
 # Navigate to backend and start
 cd backend
-exec gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000
+exec python3 -m gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000
