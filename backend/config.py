@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     
     # Default Product Configuration
     # These are defaults - actual product is set per-session
-    brand_name: str = "TechHome"
+    brand_name: str = "echo"
     product_category: str = "home_appliances"
     default_product_id: Optional[str] = None  # e.g., "wm_2026_pro"
     default_model_id: Optional[str] = None    # e.g., "AT-WM-9KG-BLACK"
