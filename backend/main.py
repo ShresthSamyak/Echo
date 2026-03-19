@@ -5,6 +5,7 @@ from typing import Optional, Literal, List
 import uvicorn
 from contextlib import asynccontextmanager
 
+import os
 from config import settings
 from product_db import product_db
 from database import db  # Supabase database
@@ -82,13 +83,25 @@ app = FastAPI(
 )
 
 # CORS Configuration
+allowed_origins = os.getenv("ALLOWED_ORIGINS", settings.frontend_url + ",http://localhost:5173,http://localhost:5174,http://localhost:3000,http://localhost:3001").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://localhost:3001"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 # Request/Response Models
 class ChatRequest(BaseModel):
